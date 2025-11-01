@@ -1,0 +1,11 @@
+apiVersion: networking.istio.io/v1
+kind: Sidecar
+metadata:
+  name: default
+  namespace: test
+spec:
+  egress:
+    - hosts:
+      - "./*"           # Allow access to all services in the current namespace
+      - "istio-system/*" 
+      - "default/*" 
