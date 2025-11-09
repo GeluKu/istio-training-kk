@@ -1,0 +1,352 @@
+# ==============================================================================
+# Ingress Resources for Istio Monitoring Stack
+# ==============================================================================
+# This configuration exposes Kiali, Grafana, Prometheus, and Jaeger dashboards
+# using Kubernetes Ingress resources with optional authentication
+# ==============================================================================
+
+---
+# Ingress for Kiali (Service Mesh Observability)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kiali-ingress
+  namespace: istio-system
+  annotations:
+    # Use your ingress controller (nginx, traefik, etc.)
+    kubernetes.io/ingress.class: "nginx"
+    # Optional: Enable TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Optional: Basic auth (create secret first)
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    # nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required'
+spec:
+  tls:
+  - hosts:
+    - kiali.yourdomain.com
+    secretName: kiali-tls
+  rules:
+  - host: kiali.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kiali
+            port:
+              number: 20001
+
+---
+# Ingress for Grafana (Metrics Visualization)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Optional: Basic auth
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    # nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required'
+spec:
+  tls:
+  - hosts:
+    - grafana.yourdomain.com
+    secretName: grafana-tls
+  rules:
+  - host: grafana.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+
+---
+# Ingress for Prometheus (Metrics Collection)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # IMPORTANT: Prometheus should be protected - enable auth
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required'
+spec:
+  tls:
+  - hosts:
+    - prometheus.yourdomain.com
+    secretName: prometheus-tls
+  rules:
+  - host: prometheus.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+
+---
+# Ingress for Jaeger (Distributed Tracing)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jaeger-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Optional: Basic auth
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    # nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required'
+spec:
+  tls:
+  - hosts:
+    - jaeger.yourdomain.com
+    secretName: jaeger-tls
+  rules:
+  - host: jaeger.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tracing
+            port:
+              number: 16686
+
+---
+# ==============================================================================
+# Alternative: Single Ingress with Path-Based Routing
+# ==============================================================================
+# Uncomment this section if you prefer path-based routing over subdomains
+# ==============================================================================
+
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: istio-monitoring-combined
+#   namespace: istio-system
+#   annotations:
+#     kubernetes.io/ingress.class: "nginx"
+#     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+#     nginx.ingress.kubernetes.io/rewrite-target: /$2
+# spec:
+#   tls:
+#   - hosts:
+#     - monitoring.yourdomain.com
+#     secretName: monitoring-tls
+#   rules:
+#   - host: monitoring.yourdomain.com
+#     http:
+#       paths:
+#       - path: /kiali(/|$)(.*)
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: kiali
+#             port:
+#               number: 20001
+#       - path: /grafana(/|$)(.*)
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: grafana
+#             port:
+#               number: 3000
+#       - path: /prometheus(/|$)(.*)
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: prometheus
+#             port:
+#               number: 9090
+#       - path: /jaeger(/|$)(.*)
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: tracing
+#             port:
+#               number: 16686
+
+---
+# ==============================================================================
+# Alternative: Istio Gateway and VirtualServices
+# ==============================================================================
+# Use native Istio resources for routing (recommended for production)
+# ==============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: monitoring-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "kiali.yourdomain.com"
+    - "grafana.yourdomain.com"
+    - "prometheus.yourdomain.com"
+    - "jaeger.yourdomain.com"
+    # Optional: Redirect HTTP to HTTPS
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: monitoring-tls-cert
+    hosts:
+    - "kiali.yourdomain.com"
+    - "grafana.yourdomain.com"
+    - "prometheus.yourdomain.com"
+    - "jaeger.yourdomain.com"
+
+---
+# VirtualService for Kiali
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: kiali-vs
+  namespace: istio-system
+spec:
+  hosts:
+  - "kiali.yourdomain.com"
+  gateways:
+  - monitoring-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: kiali
+        port:
+          number: 20001
+
+---
+# VirtualService for Grafana
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: grafana-vs
+  namespace: istio-system
+spec:
+  hosts:
+  - "grafana.yourdomain.com"
+  gateways:
+  - monitoring-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: grafana
+        port:
+          number: 3000
+
+---
+# VirtualService for Prometheus
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: prometheus-vs
+  namespace: istio-system
+spec:
+  hosts:
+  - "prometheus.yourdomain.com"
+  gateways:
+  - monitoring-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: prometheus
+        port:
+          number: 9090
+
+---
+# VirtualService for Jaeger
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: jaeger-vs
+  namespace: istio-system
+spec:
+  hosts:
+  - "jaeger.yourdomain.com"
+  gateways:
+  - monitoring-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: tracing
+        port:
+          number: 16686
+
+---
+# ==============================================================================
+# AuthorizationPolicy for additional security (Istio native)
+# ==============================================================================
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: monitoring-access
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: kiali
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+  - from:
+    - source:
+        namespaces: ["istio-system"]
+  # Uncomment to allow specific IPs
+  # - from:
+  #   - source:
+  #       ipBlocks: ["10.0.0.0/8", "192.168.0.0/16"]
+
+---
+# ==============================================================================
+# Basic Auth Secret (for nginx ingress controller)
+# ==============================================================================
+# Create this secret to enable basic authentication
+# Username: admin, Password: change-this-password
+# Generate with: htpasswd -c auth admin
+# Then create: kubectl create secret generic monitoring-basic-auth --from-file=auth -n istio-system
+# ==============================================================================
