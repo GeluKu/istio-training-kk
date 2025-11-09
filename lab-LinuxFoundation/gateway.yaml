@@ -4,7 +4,7 @@ metadata:
   name: ingress-gateway
 spec:
   selector:
-    ingress: ingressgateway  # Changed from istio: ingressgateway to match IstioOperator labels
+    istio: ingressgateway  # Changed to match the actual pod label
   servers:
     - port:
         number: 80
