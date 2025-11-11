@@ -1,0 +1,30 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: helloworld-vs
+spec:
+  hosts:
+    - "helloworld.default.svc.cluster.local"
+  http:
+    - match:
+        - uri:
+            prefix: "/v1"
+      rewrite:
+        uri: "/hello"
+      route:
+        - destination:
+            host: helloworld.default.svc.cluster.local
+            port:
+              number: 5000
+            subset: version-one
+    - match:
+        - uri:
+            prefix: "/v2"
+      rewrite:
+        uri: "/hello"
+      route:
+        - destination:
+            host: helloworld.default.svc.cluster.local
+            port:
+              number: 5000
+            subset: version-two
