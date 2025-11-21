@@ -1,0 +1,1 @@
+while sleep 0.01;do curl -sS 'http://'"$INGRESS_HOST"'/productpage'\ &> /dev/null ; done
